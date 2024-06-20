@@ -37,11 +37,9 @@ async def auth_topic(_, __, message):
     for chat in Config.AUTH_CHATS:
         if ":" in chat:
             chat_id, topic_id = chat.split(":")
-            if (
-                int(chat_id) == message.chat.id
-                and message.is_topic_message
-                and message.message_thread_id == int(topic_id)
-            ):
+            if (int(chat_id) == message.chat.id and 
+                message.is_topic_message and 
+                message.message_thread_id == int(topic_id)):
                 return True
         elif int(chat) == message.chat.id:
             return True
@@ -51,39 +49,51 @@ chat = None  # Initialize chat globally
     
 def start(update, context):
     global chat
+    user_message = update.message.text
+    
+    # Authorization Check
+    if not asyncio.run(auth_topic(None, None, update.message)):
+        update.message.reply_text("Unauthorized access!")
+        return
+    
     update.message.reply_text("Hello! I am your chatbot. Send me a message to start.")
     chat = model.start_chat(history=[])
   
 def handle_message(update: Update, context: CallbackContext):
-    user_message = update.message.text
     global chat
-    # Authorization check
-    if await auth_topic(None, None, update.message):
-        if chat is None:
-            chat = model.start_chat(history=[])
-        else:
-            print(chat.history)
-        response = chat.send_message(user_message)
-        response_text = response.text if hasattr(response, 'text') else "Sorry, I couldn't process your request."
-        update.message.reply_text(response_text)
+    user_message = update.message.text
+    
+    # Authorization Check
+    if not asyncio.run(auth_topic(None, None, update.message)):
+        update.message.reply_text("Unauthorized access!")
+        return
+    
+    if chat is None:
+        chat = model.start_chat(history=[])
     else:
-        update.message.reply_text("You are not authorized to use this bot.")
+        print(chat.history)
+    
+    response = chat.send_message(user_message)
+    response_text = response.text if hasattr(response, 'text') else "Sorry, I couldn't process your request."
+    update.message.reply_text(response_text)
   
 def handle_photo(update: Update, context: CallbackContext):
-  if await auth_topic(None, None, update.message):
-    photo = update.message.photo[-1]
-    file = context.bot.get_file(photo.file_id)
-    file.download('photo.jpg')
-    img = PIL.Image.open('photo.jpg')
-
-    user_message = update.message.caption or "What's in the picture? Watch carefully and describe all details."
-
+  photo = update.message.photo[-1]
+  file = context.bot.get_file(photo.file_id)
+  file.download('photo.jpg')
+  img = Image.open('photo.jpg')
+    
+  user_message = update.message.caption or "What's in the picture? Watch carefully and describe all details."
+    
     vision_model = genai.GenerativeModel('gemini-pro-vision')
-
     response = vision_model.generate_content([user_message, img], stream=False)
     response.resolve()
-
-    # Send response back to user
+    
+    # Authorization Check
+    if not asyncio.run(auth_topic(None, None, update.message)):
+        update.message.reply_text("Unauthorized access!")
+        return
+    
     update.message.reply_text(textwrap.indent(response.text, '> '))
 def main():
     TOKEN = os.getenv("TELEGRAM_API_KEY")
