@@ -34,22 +34,23 @@ model = genai.GenerativeModel('gemini-pro')
 #chat = model.start_chat(history=[])
 global chat
 
-# List of authorized chats with and without topic IDs
-# Example: ['-1002086404082', '-1002086404082:4316']
-AUTH_CHATS = [
-    '-1002086404082:4316'    # chat_id with topic ID
+# Initialize global chat variable
+chat = None
+
+# List of authorized chat IDs and thread IDs
+AUTHORIZED_CHAT_IDS = [
+    {"chat_id": -1002086404082, "thread_id": 4316},
+    # Add more authorized chats if needed
 ]
 
 def is_authorized(update: Update):
-    chat_id = str(update.message.chat.id)
-    message_thread_id = str(update.message.message_thread_id) if hasattr(update.message, 'message_thread_id') and update.message.message_thread_id is not None else None
+    chat_id = update.message.chat_id
+    thread_id = update.message.message_thread_id if update.message.message_thread_id else update.message.message_id
     
-    combined_id = f"{chat_id}:{message_thread_id}" if message_thread_id else chat_id
-
-    return combined_id in AUTH_CHATS
-
-# Initialize global chat variable
-chat = None
+    for auth_chat in AUTHORIZED_CHAT_IDS:
+        if chat_id == auth_chat["chat_id"] and thread_id == auth_chat["thread_id"]:
+            return True
+    return False
     
 def start(update, context):
     global chat
@@ -76,6 +77,10 @@ def handle_message(update: Update, context: CallbackContext):
     update.message.reply_text(response_text)
   
 def handle_photo(update: Update, context: CallbackContext):
+  if not is_authorized(update):
+        update.message.reply_text("You are not authorized to use this bot in this chat.")
+        return
+    
     photo = update.message.photo[-1]
     file = context.bot.get_file(photo.file_id)
     file.download('photo.jpg')
