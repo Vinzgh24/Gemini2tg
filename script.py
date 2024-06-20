@@ -30,16 +30,49 @@ genai.configure(api_key=google_api_key)
 model = genai.GenerativeModel('gemini-pro')
 #modelone = genai.GenerativeModel('gemini-pro-vision')
 
+AUTHORIZED_CHAT_TOPIC = "-1002086404082:4316"  # replace with your actual group and topic
+
+chat = None
+
+def extract_chat_topic(update: Update) -> str:
+    chat_id = update.message.chat_id
+    message_thread_id = update.message.message_thread_id
+    # Create a combined chat_id:topic_id string
+    combined_id = f"{chat_id}:{message_thread_id}" if message_thread_id else f"{chat_id}"
+    return combined_id
+
+def is_authorized(update: Update) -> bool:
+    combined_id = extract_chat_topic(update)
+    # Check if the combined ID matches the authorized chat and topic combination
+    return combined_id == AUTHORIZED_CHAT_TOPIC
+
+def handle_photo(update: Update, context: CallbackContext):
+    # Example function to handle photos, adding for completeness
+    if not is_authorized(update):
+        update.message.reply_text("You are not authorized to use this bot in this chat.")
+        return
+    # Handle the photo message
+    update.message.reply_text("Received a photo!")
+  
 #chat = model.start_chat(history=[])
 global chat
     
 def start(update, context):
     global chat
+    if not is_authorized(update):
+        update.message.reply_text("You are not authorized to use this bot in this chat.")
+        return
+      
     update.message.reply_text("Hello! I am your chatbot. Send me a message to start.")
     chat = model.start_chat(history=[])
+  
 def handle_message(update: Update, context: CallbackContext):
-    user_message = update.message.text
     global chat
+    if not is_authorized(update):
+        update.message.reply_text("You are not authorized to use this bot in this chat.")
+        return
+
+    user_message = update.message.text
     if chat is None:
         chat = model.start_chat(history=[])
     else:
