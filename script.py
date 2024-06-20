@@ -30,6 +30,8 @@ genai.configure(api_key=google_api_key)
 model = genai.GenerativeModel('gemini-pro')
 #modelone = genai.GenerativeModel('gemini-pro-vision')
 
+chat = None  # Initialize chat globally
+
 class Config:
     AUTH_CHATS = ["-1002086404082:4316"]  # Add your authorized chat IDs here
 
@@ -44,8 +46,6 @@ async def auth_topic(_, __, message):
         elif int(chat) == message.chat.id:
             return True
     return False
-
-chat = None  # Initialize chat globally
     
 def start(update, context):
     global chat
