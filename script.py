@@ -31,9 +31,6 @@ model = genai.GenerativeModel('gemini-pro')
 #modelone = genai.GenerativeModel('gemini-pro-vision')
 
   
-#chat = model.start_chat(history=[])
-global chat
-
 # Initialize global chat variable
 chat = None
 
