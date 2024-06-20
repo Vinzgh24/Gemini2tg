@@ -1,6 +1,6 @@
 import pathlib
 import textwrap
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, Bot
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 import google.generativeai as genai
 import json
@@ -30,54 +30,47 @@ genai.configure(api_key=google_api_key)
 model = genai.GenerativeModel('gemini-pro')
 #modelone = genai.GenerativeModel('gemini-pro-vision')
 
-  
-# Initialize global chat variable
-chat = None
+class Config:
+    AUTH_CHATS = ["-1002086404082:4316"]  # Add your authorized chat IDs here
 
-# List of authorized chat IDs and thread IDs
-AUTHORIZED_CHAT_IDS = [
-    {"chat_id": -1002086404082, "thread_id": 4316},
-    # Add more authorized chats if needed
-]
-
-def is_authorized(update: Update):
-    chat_id = update.message.chat_id
-    thread_id = update.message.message_thread_id if update.message.message_thread_id else update.message.message_id
-    
-    for auth_chat in AUTHORIZED_CHAT_IDS:
-        if chat_id == auth_chat["chat_id"] and thread_id == auth_chat["thread_id"]:
+async def auth_topic(_, __, message):
+    for chat in Config.AUTH_CHATS:
+        if ":" in chat:
+            chat_id, topic_id = chat.split(":")
+            if (
+                int(chat_id) == message.chat.id
+                and message.is_topic_message
+                and message.message_thread_id == int(topic_id)
+            ):
+                return True
+        elif int(chat) == message.chat.id:
             return True
     return False
+
+chat = None  # Initialize chat globally
     
 def start(update, context):
     global chat
-    if not is_authorized(update):
-        update.message.reply_text("You are not authorized to use this bot in this chat.")
-        return
-
     update.message.reply_text("Hello! I am your chatbot. Send me a message to start.")
     chat = model.start_chat(history=[])
   
 def handle_message(update: Update, context: CallbackContext):
-    global chat
-    if not is_authorized(update):
-        update.message.reply_text("You are not authorized to use this bot in this chat.")
-        return
-
     user_message = update.message.text
-    if chat is None:
-        chat = model.start_chat(history=[])
+    global chat
+    # Authorization check
+    if await auth_topic(None, None, update.message):
+        if chat is None:
+            chat = model.start_chat(history=[])
+        else:
+            print(chat.history)
+        response = chat.send_message(user_message)
+        response_text = response.text if hasattr(response, 'text') else "Sorry, I couldn't process your request."
+        update.message.reply_text(response_text)
     else:
-        print(chat.history)
-    response = chat.send_message(user_message)
-    response_text = response.text if hasattr(response, 'text') else "Sorry, I couldn't process your request."
-    update.message.reply_text(response_text)
+        update.message.reply_text("You are not authorized to use this bot.")
   
 def handle_photo(update: Update, context: CallbackContext):
-  if not is_authorized(update):
-        update.message.reply_text("You are not authorized to use this bot in this chat.")
-        return
-    
+  if await auth_topic(None, None, update.message):
     photo = update.message.photo[-1]
     file = context.bot.get_file(photo.file_id)
     file.download('photo.jpg')
